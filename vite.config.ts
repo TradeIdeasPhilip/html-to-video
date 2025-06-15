@@ -1,16 +1,15 @@
-import { defineConfig } from 'vite';
-import typescript from '@vitejs/plugin-typescript';
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [typescript()],
+  plugins: [],
   build: {
     lib: {
-      entry: 'src/lib/index.ts',
-      name: 'HtmlToMovie',
-      fileName: 'html-to-movie',
-      formats: ['es', 'umd']
+      entry: "src/lib/index.ts",
+      name: "HtmlToMovie",
+      fileName: "html-to-movie",
+      formats: ["es", "umd"],
     },
-    outDir: 'dist/lib',
-    sourcemap: true
-  }
+    outDir: "dist/lib",
+    sourcemap: true,
+  },
 });
