@@ -1,3 +1,6 @@
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
+
 /**
  * Where to get the content.
  *
@@ -51,8 +54,49 @@ let fps = 60;
  */
 let outputFileName = "my video.mov";
 
-function main() {
-  // TODO Read the arguments from the command line.
+async function main() {
+  const argv = await yargs(hideBin(process.argv))
+    .option("url", {
+      type: "string",
+      description: "URL of the HTML page to convert",
+      default: url,
+    })
+    .option("script", {
+      type: "string",
+      description: "JavaScript to run on the page",
+      default: script,
+    })
+    .option("width", {
+      type: "number",
+      description: "Video width in pixels",
+      default: width,
+    })
+    .option("height", {
+      type: "number",
+      description: "Video height in pixels",
+      default: height,
+    })
+    .option("fps", {
+      type: "number",
+      description: "Frames per second",
+      default: fps,
+    })
+    .option("output", {
+      type: "string",
+      description: "Output video file name",
+      default: outputFileName,
+    })
+    .help()
+    .alias("help", "h")
+    .parse();
+
+  // Update variables with parsed values
+  url = argv.url;
+  script = argv.script;
+  width = argv.width;
+  height = argv.height;
+  fps = argv.fps;
+  outputFileName = argv.output;
 
   // Test the work so far.
   const now = new Date().toString();
