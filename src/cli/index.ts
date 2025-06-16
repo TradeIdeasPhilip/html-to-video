@@ -103,4 +103,10 @@ async function main() {
   console.log({ now, url, script, width, height, fps, outputFileName });
 }
 
-// TODO run main
+// Run main if this is the main module
+if (import.meta.url === new URL(import.meta.url).href) {
+  main().catch((error) => {
+    console.error('Error:', error);
+    process.exit(1);
+  });
+}

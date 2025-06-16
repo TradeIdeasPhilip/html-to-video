@@ -5,8 +5,8 @@ export default defineConfig({
   build: {
     lib: {
       entry: "src/lib/index.ts",
-      name: "HtmlToMovie",
-      fileName: "html-to-movie",
+      name: "HtmlToVideo",
+      fileName: "html-to-video",
       formats: ["es", "umd"],
     },
     outDir: "dist/lib",
