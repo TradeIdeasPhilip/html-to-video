@@ -1,7 +1,6 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [],
   build: {
     lib: {
       entry: "src/lib/index.ts",
@@ -9,7 +8,7 @@ export default defineConfig({
       fileName: "html-to-video",
       formats: ["es", "umd"],
     },
-    outDir: "dist/lib",
+    outDir: "dist/vite", // Temporary output directory
     sourcemap: true,
   },
 });

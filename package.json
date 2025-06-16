@@ -1,32 +1,31 @@
 {
   "name": "html-to-video",
   "version": "1.0.0",
-  "description": "Convert HTML animations to MOV files using Puppeteer and FFmpeg",
+  "description": "Convert HTML animations to video files",
   "type": "module",
   "main": "dist/lib/index.js",
-  "module": "dist/lib/index.mjs",
+  "module": "dist/lib/html-to-video.js",
   "types": "dist/lib/index.d.ts",
   "bin": {
     "html-to-video": "./bin/html-to-video.js"
   },
+  "scripts": {
+    "build": "tsc && vite build && cp dist/vite/* dist/lib/",
+    "dev": "tsc --watch",
+    "prepublishOnly": "tsc && vite build && cp dist/vite/* dist/lib/"
+  },
+  "dependencies": {
+    "puppeteer": "^23.0.0",
+    "@ffmpeg.wasm/main": "^0.12.0",
+    "yargs": "^17.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0",
+    "@types/yargs": "^17.0.0"
+  },
   "files": [
     "dist",
     "bin"
-  ],
-  "scripts": {
-    "build": "tsc && vite build",
-    "dev": "tsc --watch",
-    "prepublishOnly": "npm run build"
-  },
-  "dependencies": {
-    "@ffmpeg.wasm/main": "^0.12.0",
-    "puppeteer": "^23.0.0",
-    "yargs": "^18.0.0"
-  },
-  "devDependencies": {
-    "@types/yargs": "^17.0.33",
-    "rollup": "^4.0.0",
-    "typescript": "^5.0.0",
-    "vite": "^6.3.5"
-  }
+  ]
 }
