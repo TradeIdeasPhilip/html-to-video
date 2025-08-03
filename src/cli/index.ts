@@ -1,17 +1,63 @@
 import puppeteer, { Viewport } from "puppeteer";
 import yargs, { number } from "yargs";
 import { hideBin } from "yargs/helpers";
-import { FfmpegProcess } from "./ffmpeg";
-import { Readable } from "stream";
+import { FfmpegProcess } from "./ffmpeg.js";
+import { initScreenCapture, showFrame } from "./remote-functions.js";
+import { Readable, Writable } from "stream";
 import { pipeline } from "stream/promises";
+import { timeStamp } from "console";
+
+function sleep(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function smartWrite1(
+  stdin: NodeJS.WritableStream,
+  data: Buffer | Uint8Array | string
+): Promise<void> {
+  /*
+  console.log("smartWrite a")
+  const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+  console.log("smartWrite b")
+  const readable = Readable.from([buffer]);
+  console.log("smartWrite c")
+  await pipeline(readable, stdin);
+  console.log("smartWrite d")
+  */
+  console.log(
+    "about to write",
+    stdin.writable ? "writable" : "NOT writable",
+    new Date().toLocaleString()
+  );
+  const result = stdin.write(data);
+  console.log("result was ", result);
+  // poor man's backpressure , and if anything's going to happen in the background let it happen
+  await sleep(1000);
+}
 
 async function smartWrite(
   stdin: NodeJS.WritableStream,
   data: Buffer | Uint8Array | string
 ): Promise<void> {
-  const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
-  const readable = Readable.from([buffer]);
-  await pipeline(readable, stdin);
+  return new Promise((resolve, reject) => {
+    const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    const writable = stdin as Writable; // Type assertion
+    if (!writable.writable || writable.writableEnded) {
+      return reject(new Error("Cannot write to closed or ended stream"));
+    }
+    const canWrite = writable.write(buffer, (err) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+    if (!canWrite) {
+      writable.once("drain", resolve);
+    }
+  });
 }
 
 async function main() {
@@ -41,6 +87,10 @@ async function main() {
       type: "number",
       description: "Frames per second",
       default: 60,
+    })
+    .option("source", {
+      type: "string",
+      description: "If this is present, assert that it matches the web page.",
     })
     .option("output", {
       type: "string",
@@ -98,6 +148,13 @@ async function main() {
    */
   const fps = argv.fps;
   /**
+   * If present, compare this to the same value in the web page.
+   *
+   * If they don't match, abort before we start.
+   * It would be easy to work on the wrong file, especially in development mode.
+   */
+  const source = argv.source;
+  /**
    * The output file name.
    */
   const outputFileName = argv.output;
@@ -127,18 +184,74 @@ async function main() {
     waitUntil: "networkidle2",
   });
   await page.setViewport(viewPort);
+  const fromRemote = await page.evaluate((script: string) => {
+    return initScreenCapture(script);
+  }, script);
+  console.log(fromRemote);
+  if (source !== undefined && source !== fromRemote.source) {
+    throw new Error(
+      `Source mismatch expecting ${source} got ${fromRemote.source}.`
+    );
+  }
+  if (fromRemote.devicePixelRatio !== zoom) {
+    throw new Error(
+      `Zoom mismatch expecting ${zoom} got ${fromRemote.devicePixelRatio}.`
+    );
+  }
   console.log("about to new FfmpegProcess", new Date().toLocaleString());
+  /**
+   * TODO this should be outside of the try / catch so I can do the cleanup in the catch().
+   */
   const ffmpegProcess = new FfmpegProcess(
     FfmpegProcess.h264Args({
       framesPerSecond: fps,
       filenamePrefix: outputFileName,
     })
   );
-  console.log("about to page.screenshot", new Date().toLocaleString());
-  const screenshot = await page.screenshot({ optimizeForSpeed: true });
+  let frame = -Infinity;
+  let stopShort = false;
+  // TODO attach signal handlers to turn on stop short.
+  const slurp = async (start: number, step: number, end: number) => {
+    console.log({ start, step, end, slurp: true });
+    for (let frameCount = 0; ; frameCount++) {
+      frame = start + frameCount * step;
+      if (frameCount % 120 == 0) {
+        console.info(
+          `frameCount = ${frameCount}, frame = ${frame} at ${new Date().toLocaleTimeString()}`
+        );
+      }
+      if (frame > end) {
+        break;
+      }
+      if (stopShort) {
+        console.log("stopping short just before", frame);
+        break;
+      }
+      await page.evaluate((frame: number) => {
+        showFrame(frame);
+      }, frame);
+      const screenshot = await page.screenshot({ optimizeForSpeed: true });
+      await smartWrite(ffmpegProcess.stdin, screenshot);
+      frameCount++;
+    }
+  };
+  if (typeof fromRemote.seconds === "number") {
+    const step = 1 / fps / 1000;
+    const start = step / 2;
+    const end = fromRemote.seconds * 1000;
+    await slurp(start, step, end);
+  } else {
+    if (
+      !(
+        typeof fromRemote.firstFrame === "number" &&
+        typeof fromRemote.lastFrame === "number"
+      )
+    ) {
+      throw new Error("wtf");
+    }
+    await slurp(fromRemote.firstFrame, 1, fromRemote.lastFrame);
+  }
 
-  console.log("about to smartWrite", new Date().toLocaleString());
-  await smartWrite(ffmpegProcess.stdin, screenshot);
   console.log("about to ffmpegProcess.close", new Date().toLocaleString());
   await ffmpegProcess.close();
   console.log("about to browser.close", new Date().toLocaleString());
