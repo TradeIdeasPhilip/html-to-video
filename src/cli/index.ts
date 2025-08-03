@@ -1,9 +1,9 @@
 import puppeteer, { Viewport } from "puppeteer";
-import yargs, { number } from "yargs";
+import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 import { FfmpegProcess } from "./ffmpeg.js";
 import { initScreenCapture, showFrame } from "./remote-functions.js";
-import { Readable, Writable } from "stream";
+import { Writable } from "stream";
 
 function sleep(ms: number) {
   return new Promise((resolve) => {
@@ -153,7 +153,12 @@ async function main() {
     viewPort,
   });
 
-  const browser = await puppeteer.launch();
+  // https://stackoverflow.com/questions/77980537/nodejs-sigint-not-working-as-expected-when-using-puppeteer
+  const browser = await puppeteer.launch({
+    handleSIGINT: false,
+    handleSIGHUP: false,
+    handleSIGTERM: false,
+  });
   const page = await browser.newPage();
   await page.goto(url, {
     waitUntil: "networkidle2",
@@ -184,7 +189,7 @@ async function main() {
     })
   );
   let frame = -Infinity;
-  console.log("This is the version with the signal handlers.")
+  console.log("This is the version with the signal handlers.");
   let bailOutEarly = false;
   (["SIGINT", "SIGTERM"] as const).forEach((signal) =>
     process.on(signal, () => {
