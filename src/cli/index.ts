@@ -4,8 +4,6 @@ import { hideBin } from "yargs/helpers";
 import { FfmpegProcess } from "./ffmpeg.js";
 import { initScreenCapture, showFrame } from "./remote-functions.js";
 import { Readable, Writable } from "stream";
-import { pipeline } from "stream/promises";
-import { timeStamp } from "console";
 
 function sleep(ms: number) {
   return new Promise((resolve) => {
@@ -13,30 +11,7 @@ function sleep(ms: number) {
   });
 }
 
-async function smartWrite1(
-  stdin: NodeJS.WritableStream,
-  data: Buffer | Uint8Array | string
-): Promise<void> {
-  /*
-  console.log("smartWrite a")
-  const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
-  console.log("smartWrite b")
-  const readable = Readable.from([buffer]);
-  console.log("smartWrite c")
-  await pipeline(readable, stdin);
-  console.log("smartWrite d")
-  */
-  console.log(
-    "about to write",
-    stdin.writable ? "writable" : "NOT writable",
-    new Date().toLocaleString()
-  );
-  const result = stdin.write(data);
-  console.log("result was ", result);
-  // poor man's backpressure , and if anything's going to happen in the background let it happen
-  await sleep(1000);
-}
-
+// TODO Move this to ffmpeg.ts
 async function smartWrite(
   stdin: NodeJS.WritableStream,
   data: Buffer | Uint8Array | string
@@ -209,7 +184,14 @@ async function main() {
     })
   );
   let frame = -Infinity;
-  let stopShort = false;
+  console.log("This is the version with the signal handlers.")
+  let bailOutEarly = false;
+  (["SIGINT", "SIGTERM"] as const).forEach((signal) =>
+    process.on(signal, () => {
+      console.log(`Bailing out early because of ${signal}.`);
+      bailOutEarly = true;
+    })
+  );
   // TODO attach signal handlers to turn on stop short.
   const slurp = async (start: number, step: number, end: number) => {
     console.log({ start, step, end, slurp: true });
@@ -223,8 +205,8 @@ async function main() {
       if (frame > end) {
         break;
       }
-      if (stopShort) {
-        console.log("stopping short just before", frame);
+      if (bailOutEarly) {
+        console.log("bailing out early, just before", frame);
         break;
       }
       await page.evaluate((frame: number) => {
