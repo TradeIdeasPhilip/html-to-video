@@ -5,12 +5,6 @@ import { FfmpegProcess } from "./ffmpeg.js";
 import { initScreenCapture, showFrame } from "./remote-functions.js";
 import { Writable } from "stream";
 
-function sleep(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 // TODO Move this to ffmpeg.ts
 async function smartWrite(
   stdin: NodeJS.WritableStream,
@@ -189,54 +183,61 @@ async function main() {
     })
   );
   let frame = -Infinity;
-  console.log("This is the version with the signal handlers.");
-  let bailOutEarly = false;
-  (["SIGINT", "SIGTERM"] as const).forEach((signal) =>
-    process.on(signal, () => {
-      console.log(`Bailing out early because of ${signal}.`);
-      bailOutEarly = true;
-    })
-  );
-  // TODO attach signal handlers to turn on stop short.
-  const slurp = async (start: number, step: number, end: number) => {
-    console.log({ start, step, end, slurp: true });
-    for (let frameCount = 0; ; frameCount++) {
-      frame = start + frameCount * step;
-      if (frameCount % 120 == 0) {
-        console.info(
-          `frameCount = ${frameCount}, frame = ${frame} at ${new Date().toLocaleTimeString()}`
-        );
+  try {
+    let bailOutEarly = false;
+    (["SIGINT", "SIGTERM"] as const).forEach((signal) =>
+      process.on(signal, () => {
+        console.log(`Bailing out early because of ${signal}.`);
+        bailOutEarly = true;
+      })
+    );
+    // TODO attach signal handlers to turn on stop short.
+    const slurp = async (start: number, step: number, end: number) => {
+      console.log({ start, step, end, slurp: true });
+      for (let frameCount = 0; ; frameCount++) {
+        frame = start + frameCount * step;
+        if (frameCount % 120 == 0) {
+          console.info(
+            `frameCount = ${frameCount}, frame = ${frame} at ${new Date().toLocaleTimeString()}`
+          );
+        }
+        if (frame > end) {
+          break;
+        }
+        if (bailOutEarly) {
+          console.log("bailing out early, just before", frame);
+          break;
+        }
+        await page.evaluate((frame: number) => {
+          showFrame(frame);
+        }, frame);
+        const screenshot = await page.screenshot({ optimizeForSpeed: true });
+        // The problems I've seen the in past all came from Puppeteer, never from writing to ffmpeg.
+        //if (frameCount === 130) throw new Error("simulated DO NOT COMMIT");
+        await smartWrite(ffmpegProcess.stdin, screenshot);
       }
-      if (frame > end) {
-        break;
+    };
+    if (typeof fromRemote.seconds === "number") {
+      const step = (1 / fps) * 1000;
+      const start = step / 2;
+      const end = fromRemote.seconds * 1000;
+      await slurp(start, step, end);
+    } else {
+      if (
+        !(
+          typeof fromRemote.firstFrame === "number" &&
+          typeof fromRemote.lastFrame === "number"
+        )
+      ) {
+        throw new Error("wtf");
       }
-      if (bailOutEarly) {
-        console.log("bailing out early, just before", frame);
-        break;
-      }
-      await page.evaluate((frame: number) => {
-        showFrame(frame);
-      }, frame);
-      const screenshot = await page.screenshot({ optimizeForSpeed: true });
-      await smartWrite(ffmpegProcess.stdin, screenshot);
-      frameCount++;
+      await slurp(fromRemote.firstFrame, 1, fromRemote.lastFrame);
     }
-  };
-  if (typeof fromRemote.seconds === "number") {
-    const step = 1 / fps / 1000;
-    const start = step / 2;
-    const end = fromRemote.seconds * 1000;
-    await slurp(start, step, end);
-  } else {
-    if (
-      !(
-        typeof fromRemote.firstFrame === "number" &&
-        typeof fromRemote.lastFrame === "number"
-      )
-    ) {
-      throw new Error("wtf");
-    }
-    await slurp(fromRemote.firstFrame, 1, fromRemote.lastFrame);
+  } catch (reason) {
+    console.warn(
+      `Caught something while processing frame ${frame} at ${new Date().toLocaleString()}`,
+      reason
+    );
   }
 
   console.log("about to ffmpegProcess.close", new Date().toLocaleString());

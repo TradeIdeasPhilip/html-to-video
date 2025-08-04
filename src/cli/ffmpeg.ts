@@ -1,5 +1,6 @@
 import { ChildProcessByStdio, spawn } from "node:child_process";
 import Stream from "node:stream";
+import { sleep } from "./util.js";
 
 const makeVideoFileName = (extension: "mp4" | "mov", filenamePrefix = "") =>
   `${filenamePrefix}${Date.now()}.${extension}`;
@@ -120,7 +121,8 @@ export class FfmpegProcess {
   private get process() {
     if (!this.#running) {
       const process = spawn("ffmpeg", this.#argsForSpawn, {
-        stdio: ["pipe", "ignore", "ignore"],
+        stdio: ["pipe", "inherit", "inherit"],
+        detached: true,
       });
       const promise = Promise.withResolvers<void>();
       process.on("close", (code, signal) => {
@@ -143,6 +145,15 @@ export class FfmpegProcess {
       return;
     }
     try {
+      const debugPause = false;
+      if (debugPause) {
+        console.log(
+          "before await sleep(60000) (draining the output?)",
+          new Date().toLocaleString()
+        );
+        await sleep(60000);
+        console.log("after await sleep(60000)", new Date().toLocaleString());
+      }
       this.#running.process.stdin.end();
       await this.#running.done;
     } catch (reason) {
@@ -154,6 +165,8 @@ export class FfmpegProcess {
   }
   constructor(args = FfmpegProcess.h264Args()) {
     this.#argsForSpawn = args;
+    // So it will be one line.
+    console.log(JSON.stringify(args));
     this.#registerCleanup();
   }
   #registerCleanup() {
