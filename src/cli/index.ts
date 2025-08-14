@@ -61,9 +61,14 @@ async function main() {
       type: "string",
       description: "If this is present, assert that it matches the web page.",
     })
-    .option("output", {
+    .option("output-prefix", {
       type: "string",
-      description: "Output video file name",
+      description: "Output file name prefix",
+    })
+    .option("output-format", {
+      type: "string",
+      description: "Output file format",
+      choices: ["small", "prores", "prores-hq", "alpha"],
     })
     .help()
     .alias("help", "h")
@@ -126,7 +131,11 @@ async function main() {
   /**
    * The output file name.
    */
-  const outputFileName = argv.output;
+  const outputPrefix = argv.outputPrefix;
+  /**
+   * The output file format
+   */
+  const outputFormat = argv.outputFormat;
 
   // Test the work so far.
   const now = new Date().toString();
@@ -142,7 +151,8 @@ async function main() {
     width,
     height,
     fps,
-    outputFileName,
+    outputPrefix,
+    outputFormat,
     zoom,
     viewPort,
   });
@@ -176,11 +186,10 @@ async function main() {
   /**
    * TODO this should be outside of the try / catch so I can do the cleanup in the catch().
    */
-  const ffmpegProcess = new FfmpegProcess(
-    FfmpegProcess.h264Args({
-      framesPerSecond: fps,
-      filenamePrefix: outputFileName,
-    })
+  const ffmpegProcess = FfmpegProcess.fromCommandLine(
+    outputFormat,
+    outputPrefix,
+    fps
   );
   let frame = -Infinity;
   try {
@@ -211,7 +220,10 @@ async function main() {
         await page.evaluate((frame: number) => {
           showFrame(frame);
         }, frame);
-        const screenshot = await page.screenshot({ optimizeForSpeed: true });
+        const screenshot = await page.screenshot({
+          omitBackground: true,
+          optimizeForSpeed: true,
+        });
         // The problems I've seen the in past all came from Puppeteer, never from writing to ffmpeg.
         //if (frameCount === 130) throw new Error("simulated DO NOT COMMIT");
         await smartWrite(ffmpegProcess.stdin, screenshot);

@@ -75,14 +75,33 @@ export class FfmpegProcess {
     options: {
       framesPerSecond?: number;
       filenamePrefix?: string;
-      filesize?: "big" | "small";
+      filesize?: "big" | "small" | "alpha";
     } = {}
   ) {
     options.framesPerSecond ??= 60;
     options.filenamePrefix ??= "";
     options.filesize ??= "small";
     //  // Set to 1 for ProRes 422 (lower bitrate than 422 HQ)  Set to 3 to get ProRes 422 HQ, ~10gig/minute
-    const level = options.filesize === "big" ? "3" : "1";
+    let level: string;
+    switch (options.filesize) {
+      case "big": {
+        level = "3";
+        break;
+      }
+      case "alpha": {
+        level = "4444";
+        break;
+      }
+      case "small":
+      case undefined: {
+        level = "3";
+        break;
+      }
+      default: {
+        throw new Error("wtf");
+      }
+    }
+    //const level = options.filesize === "big" ? "3" : "1";
     return [
       "-loglevel",
       "warning",
@@ -168,6 +187,40 @@ export class FfmpegProcess {
     // So it will be one line.
     console.log(JSON.stringify(args));
     this.#registerCleanup();
+  }
+  static fromCommandLine(
+    outputFormat: string | unknown,
+    filenamePrefix: string | undefined,
+    framesPerSecond:number
+  ) {
+    filenamePrefix ??="";
+    outputFormat ??="small";
+    if (!(Number.isSafeInteger(framesPerSecond)&&(framesPerSecond>0))) {
+      throw new Error(`Invalid # of frames per second: ${framesPerSecond}.`);
+    }
+    let args : string[];
+    switch (outputFormat) {
+      case "small":{
+        args = this.h264Args({filenamePrefix,framesPerSecond})
+        break;
+      }
+      case "prores":{
+        args=this.proresArgs({filenamePrefix,framesPerSecond,filesize:"small"})
+        break;
+      }
+      case "prores-hq":{
+        args=this.proresArgs({filenamePrefix,framesPerSecond,filesize:"big"})
+        break;
+      }
+      case "alpha":{
+        args=this.proresArgs({filenamePrefix,framesPerSecond,filesize:"alpha"})
+        break;
+      }
+      default:{
+        throw new Error(`Unknown output-type: “${outputFormat}”.`);
+      }
+    }
+    return new this(args);
   }
   #registerCleanup() {
     /*     addEventListener("unhandledrejection", (event) => {
