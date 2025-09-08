@@ -59,6 +59,9 @@ export class FfmpegProcess {
       "frag_keyframe+empty_moov+faststart", // Crash-tolerant, CapCut-ready
       "-r",
       options.framesPerSecond.toString(),
+      //"-vf",
+      //"scale=3840:2160:flags=lanczos",
+      //"scale=1920:1080:flags=lanczos",
       makeVideoFileName("mp4", options.filenamePrefix),
     ];
   }
@@ -191,32 +194,44 @@ export class FfmpegProcess {
   static fromCommandLine(
     outputFormat: string | unknown,
     filenamePrefix: string | undefined,
-    framesPerSecond:number
+    framesPerSecond: number
   ) {
-    filenamePrefix ??="";
-    outputFormat ??="small";
-    if (!(Number.isSafeInteger(framesPerSecond)&&(framesPerSecond>0))) {
+    filenamePrefix ??= "";
+    outputFormat ??= "small";
+    if (!(Number.isSafeInteger(framesPerSecond) && framesPerSecond > 0)) {
       throw new Error(`Invalid # of frames per second: ${framesPerSecond}.`);
     }
-    let args : string[];
+    let args: string[];
     switch (outputFormat) {
-      case "small":{
-        args = this.h264Args({filenamePrefix,framesPerSecond})
+      case "small": {
+        args = this.h264Args({ filenamePrefix, framesPerSecond });
         break;
       }
-      case "prores":{
-        args=this.proresArgs({filenamePrefix,framesPerSecond,filesize:"small"})
+      case "prores": {
+        args = this.proresArgs({
+          filenamePrefix,
+          framesPerSecond,
+          filesize: "small",
+        });
         break;
       }
-      case "prores-hq":{
-        args=this.proresArgs({filenamePrefix,framesPerSecond,filesize:"big"})
+      case "prores-hq": {
+        args = this.proresArgs({
+          filenamePrefix,
+          framesPerSecond,
+          filesize: "big",
+        });
         break;
       }
-      case "alpha":{
-        args=this.proresArgs({filenamePrefix,framesPerSecond,filesize:"alpha"})
+      case "alpha": {
+        args = this.proresArgs({
+          filenamePrefix,
+          framesPerSecond,
+          filesize: "alpha",
+        });
         break;
       }
-      default:{
+      default: {
         throw new Error(`Unknown output-type: “${outputFormat}”.`);
       }
     }
