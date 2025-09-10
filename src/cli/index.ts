@@ -164,6 +164,11 @@ async function main() {
     handleSIGTERM: false,
   });
   const page = await browser.newPage();
+  page.on("console", (msg) => console.log("PAGE LOG:", msg.text()));
+  page.on("pageerror", (err) => console.error("PAGE ERROR:", err));
+  page.on("requestfailed", (request) =>
+    console.log("FAILED REQUEST:", request.url())
+  );
   await page.goto(url, {
     waitUntil: "networkidle2",
   });
@@ -220,7 +225,21 @@ async function main() {
         await page.evaluate((frame: number) => {
           showFrame(frame);
         }, frame);
+        /*
+        await page.evaluate(
+          () =>
+            new Promise((resolve) =>
+              window.requestAnimationFrame(() =>
+                window.requestAnimationFrame(resolve)
+              )
+            )
+        );
+        */
+        //await page.waitForTimeout(1000);
+        //await new Promise(resolve => setTimeout(resolve, 2000));
         const screenshot = await page.screenshot({
+         // type: "jpeg",
+         // quality: 90,
           omitBackground: true,
           optimizeForSpeed: true,
         });
