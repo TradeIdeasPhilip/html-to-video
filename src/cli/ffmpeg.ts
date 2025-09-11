@@ -14,6 +14,45 @@ type Running = {
  * This creates the *.mp4 file.
  */
 export class FfmpegProcess {
+  static hevcArgs(
+    options: { framesPerSecond?: number; filenamePrefix?: string } = {}
+  ) {
+    options.framesPerSecond ??= 60;
+    options.filenamePrefix ??= "";
+    return [
+      "-loglevel",
+      "warning",
+      "-framerate",
+      options.framesPerSecond.toString(),
+      "-f",
+      "image2pipe",
+      "-i",
+      "-",
+      "-c:v",
+      "libx265",
+      "-preset",
+      "medium",
+      "-crf",
+      "20",
+      "-profile:v",
+      "main10",
+      "-pix_fmt",
+      "yuv420p10le",
+      "-colorspace",
+      "bt709",
+      "-color_primaries",
+      "bt709",
+      "-color_trc",
+      "bt709",
+      "-color_range",
+      "tv",
+      "-movflags",
+      "+faststart",
+      "-r",
+      options.framesPerSecond.toString(),
+      makeVideoFileName("mp4", options.filenamePrefix),
+    ];
+  }
   /**
    * FFmpeg settings for H.264 in MP4 container, optimized for YouTube uploads.
    * @remarks
@@ -185,7 +224,7 @@ export class FfmpegProcess {
       console.error(reason);
     }
   }
-  constructor(args = FfmpegProcess.h264Args()) {
+  constructor(args = FfmpegProcess.hevcArgs()) {
     this.#argsForSpawn = args;
     // So it will be one line.
     console.log(JSON.stringify(args));
@@ -204,7 +243,7 @@ export class FfmpegProcess {
     let args: string[];
     switch (outputFormat) {
       case "small": {
-        args = this.h264Args({ filenamePrefix, framesPerSecond });
+        args = this.hevcArgs({ filenamePrefix, framesPerSecond });
         break;
       }
       case "prores": {
