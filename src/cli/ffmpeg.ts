@@ -14,7 +14,7 @@ type Running = {
  * This creates the *.mp4 file.
  */
 export class FfmpegProcess {
-  static hevcArgs(
+  static h265Args(
     options: { framesPerSecond?: number; filenamePrefix?: string } = {}
   ) {
     options.framesPerSecond ??= 60;
@@ -29,11 +29,9 @@ export class FfmpegProcess {
       "-i",
       "-",
       "-c:v",
-      "libx265",
-      "-preset",
-      "medium",
-      "-crf",
-      "20",
+      "hevc_videotoolbox",
+      "-q:v",
+      "30",
       "-profile:v",
       "main10",
       "-pix_fmt",
@@ -46,8 +44,10 @@ export class FfmpegProcess {
       "bt709",
       "-color_range",
       "tv",
+      "-tag:v",
+      "hvc1",
       "-movflags",
-      "+faststart",
+      "+faststart+write_colr",
       "-r",
       options.framesPerSecond.toString(),
       makeVideoFileName("mp4", options.filenamePrefix),
@@ -224,7 +224,7 @@ export class FfmpegProcess {
       console.error(reason);
     }
   }
-  constructor(args = FfmpegProcess.hevcArgs()) {
+  constructor(args = FfmpegProcess.h265Args()) {
     this.#argsForSpawn = args;
     // So it will be one line.
     console.log(JSON.stringify(args));
@@ -243,7 +243,7 @@ export class FfmpegProcess {
     let args: string[];
     switch (outputFormat) {
       case "small": {
-        args = this.hevcArgs({ filenamePrefix, framesPerSecond });
+        args = this.h265Args({ filenamePrefix, framesPerSecond });
         break;
       }
       case "prores": {
